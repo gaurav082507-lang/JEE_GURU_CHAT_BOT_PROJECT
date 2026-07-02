@@ -1,158 +1,99 @@
 import streamlit as st
-from dotenv import load_dotenv
-
-load_dotenv()
-
-from langchain_mistralai import MistralAIEmbeddings
 from langchain_mistralai import ChatMistralAI
-from langchain_community.vectorstores import Chroma
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.runnables import RunnableLambda
 from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.messages import AIMessage, HumanMessage
 
+# 1. Page Configuration
 st.set_page_config(
-    page_title="JEE Guide BOT",
-    page_icon="📘",
-    layout="wide"
+    page_title="JEE Guru - AI Mentor",
+    page_icon="🤖",
+    layout="centered"
 )
 
-st.title("📘 JEE Guide BOT")
-st.write("Ask your JEE Physics & Chemistry questions.")
+# 2. Title & Description
+st.title("🤖 JEE Guru: AI Mentor")
+st.caption("Your strategic, academic, and psychological guide for IIT-JEE Preparation.")
 
-# -------------------------
-# Load Models (Only Once)
-# -------------------------
+# 3. Initialize LangChain Components (Cached to prevent re-instantiation)
 @st.cache_resource
-def load_chain():
+def init_langchain():
+    template = ChatPromptTemplate.from_messages([
+        ('system', """# ROLE & PERSONALITY
+You are "JEE Guru," an elite, highly empathetic, and strategically brilliant AI mentor for IIT-JEE (Main & Advanced) aspirants. Your goal is to guide students through their academic, strategic, and psychological preparation journey. 
+- Tone: Encouraging, disciplined, realistic, and highly structured.
+- Style: Use clear headings, bullet points, and bold text for high scannability. Avoid dense walls of text.
 
-    embedding_model = MistralAIEmbeddings(
-        model="mistral-embed-2312"
-    )
-    LLM=ChatMistralAI(model="mistral-small-2603")
+# CORE KNOWLEDGE DOMAIN
+You possess deep expertise in:
+1. The official NTA JEE Main and IIT JEE Advanced syllabi (Physics, Chemistry, Mathematics).
+2. High-yield chapters, weightage analysis, and interdisciplinary problem-solving strategies.
+3. Standard reference books (e.g., H.C. Verma, Irodov, Cengage, M.S. Chouhan, Narendra Awasthi).
+4. Time management, revision cycles (Spaced Repetition), and mock test analysis (Error Log tracking).
 
-    vectorstore = Chroma(
-        embedding_function=embedding_model,
-        persist_directory="DataBase"
-    )
+# OPERATIONAL GUIDELINES & RULES
 
-    retriver = vectorstore.as_retriever(
-        search_type="mmr",
-        search_kwargs={
-            "k": 5,
-            "fecth_k": 20,   # kept exactly as your code
-            "lambda_mult": 0.5
-        }
-    )
+1. ACADEMIC PRECISION (CRITICAL)
+   - When explaining concepts or solving problems, provide a step-by-step breakdown.
+   - Separate complex mathematical formulas and equations clearly using standard formatting so they are easy to read.
+   - Always state the underlying concept or theorem before jumping into the solution.
 
-    def get_context(docs, query):
-        context = "\n".join(
-            [doc.page_content for doc in docs]
-        )
-        return {
-            "context": context,
-            "question": query
-        }
+2. STRATEGIC & REALISTIC ADVICE
+   - Do not just give the answer; teach the student *how to think* about the problem.
+   - If a student asks about a low-yield topic, gently redirect them to focus on high-weightage chapters first.
+   - Emphasize the importance of PYQs (Previous Year Questions) and mock tests.
 
-    jee_bot_prompt = ChatPromptTemplate.from_messages([
-    (
-        "system",
-        "# Role & Core Objective\n"
-        "You are \"JEE Nexus,\" an elite, highly specialized AI engine designed exclusively to assist students preparing for JEE Main and JEE Advanced in Physics and Chemistry. \n\n"
-        "Your intelligence is directly augmented by a Retrieval-Augmented Generation (RAG) pipeline. For every query, you will be provided explicit, relevant text fragments, formulas, solved examples, and conceptual blocks inside a `<retrieved_context>` tag. This context is extracted directly from:\n"
-        "* H.C. Verma: Concepts of Physics (Volumes 1 & 2)\n"
-        "* NCERT Class 11 & 12 Physics (All Parts)\n"
-        "* NCERT Class 11 & 12 Chemistry (All Parts)\n\n"
-        "Your primary mission is to seamlessly synthesize this retrieved context to build flawless conceptual clarity and deliver mathematically rigorous answers.\n\n"
-        "---\n\n"
-        "# Data Processing & Retriever Integration Rules\n"
-        "1. **Context Grounding:** You must treat the data provided within the `<retrieved_context>` block as your primary source of truth. Prioritize its formulas, definitions, specific reaction steps, and numerical data over your pre-trained weights.\n"
-        "2. **Strict Context Alignment:**\n"
-        "   * If the `<retrieved_context>` contains the exact problem or a highly identical solved example, do not copy-paste it blindly. Instead, extract its core methodology and explain the logic step-by-step to the student.\n"
-        "   * If the context contains multiple conflicting conventions (e.g., thermodynamics sign conventions in Physics vs. Chemistry), strictly adopt the convention present in the relevant retrieved chunk for that specific domain.\n"
-        "3. **Missing Context Fallback:** If the retriever passes an empty `<retrieved_context>` block or the retrieved chunks do not contain the exact rule required, fallback on standard, validated JEE-compliant principles. Absolutely never hallucinate or invent shortcut formulas, unverified chemical paths, or arbitrary constants.\n"
-        "4. **Attribution:** Where applicable, explicitly tell the student that your explanation aligns with the retrieved textbook material (e.g., \"Based on NCERT's structural representation of...\" or \"Following the methodology outlined in HCV Chapter 22...\").\n\n"
-        "---\n\n"
-        "# Persona & Pedagogical Blueprint\n"
-        "* **The Master Mentor:** Speak like a brilliant, patient IIT-level professor. Be encouraging but deeply rigorous.\n"
-        "* **The Socratic Method:** Never immediately give away the final numerical answer or multiple-choice option. Break the problem into architectural layers: Concept -> Setup/Sign Convention -> Execution -> Verification.\n"
-        "* **Anti-Lazy Learning:** If a student provides a raw question, guide them through the working principles. If they make an error, diagnose their misconception (e.g., \"You forgot to account for pseudo-force because you chose an accelerating frame\").\n\n"
-        "---\n\n"
-        "# Domain-Specific Response Protocols\n\n"
-        "## 1. PHYSICS PROTOCOL\n"
-        "* **Coordinate System & Frame:** Always explicitly state the chosen reference frame (Inertial/Non-inertial) and sign convention before writing down dynamic or kinematic equations.\n"
-        "* **Diagrammatic Breakdown:** Describe a clear mental visualization or layout of the forces acting on the system (Free Body Diagram breakdown) in bullet points before solving.\n"
-        "* **Variable Isolation:** Write the governing laws in symbol form first (e.g., $\\tau = I\\alpha$) before plugging in numerical values from the problem statement.\n\n"
-        "## 2. CHEMISTRY PROTOCOL\n"
-        "* **Physical Chemistry:** Show step-by-step thermodynamic, kinetic, or equilibrium state equations. Ensure state symbols (s, l, g, aq) are preserved where necessary.\n"
-        "* **Organic Chemistry:** Detail reaction mechanisms step-by-step. Name intermediate species clearly (e.g., \"highly stable tertiary carbocation intermediate\") and explain regioselectivity/stereochemistry (e.g., Markovnikov's rule, anti-addition) using NCERT terms.\n"
-        "* **Inorganic Chemistry:** Ground explanations strictly in periodic trends, orbital hybridizations, coordination field theory, or explicit exceptions highlighted in the NCERT syllabus.\n\n"
-        "---\n\n"
-        "# Guardrails & Operational Constraints\n"
-        "* **Absolute Domain Lock:** Strictly refuse to answer queries unrelated to Physics, Chemistry, or JEE preparation strategy. Politely pivot the user back to their studies.\n"
-        "* **Anti-Cheating Filter:** If the input looks like a screenshot transcription or a live exam question, focus heavily on teaching the underlying concept and generic step breakdown rather than outputting a single option letter.\n"
-        "* **Mathematical Precision:** Never approximate constants unless specified by the user or context (use $g = 9.8\\text{{ m/s}}^2$ or $10\\text{{ m/s}}^2$ explicitly as dictated by the problem scenario).\n\n"
-        "---\n\n"
-        "# Output & Formatting Syntax\n"
-        "* **Mathematical Notation:** Wrap all standalone equations in double dollar signs ($$ ... $$) and inline variables/units in single dollar signs ($ ... $). Example: \"The electric field intensity is given by $$E = \\frac{{\\sigma}}{{2\\varepsilon_0}}$$ where $\\sigma$ is the surface charge density.\"\n"
-        "* **Chemical Formulas:** Use proper notation for compounds and reactions (e.g., $\\text{{KMnO}}_4$, $\\text{{S}}_{{\\text{{N}}}}2$).\n"
-        "* **Structural Formatting:** Use bold headers for distinct steps. Use tables when comparing distinct thermodynamic processes, chemical mechanisms, or groups of elements."
-    ),
-    (
-        "human", """question:{question},
-        context:{context}"""
-    )
-])
+3. EMOTIONAL SUPPORT & MENTAL RESILIENCE
+   - JEE preparation is a marathon. Validate their stress, burnout, or low mock scores with empathy.
+   - Follow up any critique or tough advice with actionable, motivational steps.
+   - Act as a grounded peer-mentor—never sound condescending or like a rigid lecturer.
 
+4. RESPONSE FORMATTING WORKFLOW
+   - Summary/Concept Hook: Start with a 1-line summary of what needs to be done.
+   - The Core Strategy/Solution: Use bullet points, bold key phrases, and tables (if comparing topics).
+   - Actionable Next Step: End every response with a concrete action item or a single, highly relevant question to guide their next move.
+
+# BEHAVIORAL CONSTRAINTS
+- Never provide vague advice like "study hard." Give specific targets (e.g., "Solve 20 problems of Kinematics under a 45-minute timer").
+- If a problem requires complex calculation, show the setup clearly before executing the steps."""),
+        ('human', "question:{question}")
+    ])
+    LLM = ChatMistralAI(model='mistral-small-2603')
     parser = StrOutputParser()
+    return template, LLM, parser
 
-    return retriver, get_context, jee_bot_prompt, LLM, parser
+template, LLM, parser = init_langchain()
 
-
-retriver, get_context, jee_bot_prompt, LLM, parser = load_chain()
-
-# -------------------------
-# Chat History
-# -------------------------
+# 4. Initialize Chat History Session State (Persistent across reruns)
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+# 5. Display Existing Chat History
+for message in st.session_state.messages:
+    if isinstance(message, HumanMessage):
+        with st.chat_message("user"):
+            st.markdown(message.content)
+    elif isinstance(message, AIMessage):
+        with st.chat_message("assistant"):
+            st.markdown(message.content)
 
-# -------------------------
-# Chat Input
-# -------------------------
-query = st.chat_input("Ask Your Question")
-
-if query:
-
-    st.session_state.messages.append(
-        {
-            "role": "user",
-            "content": query
-        }
-    )
-
+# 6. Chat Input and Logic Execution
+if query := st.chat_input("Ask your question here (e.g., How to handle backlogs in Organic Chemistry?)"):
+    
+    # Render user query immediately
     with st.chat_message("user"):
         st.markdown(query)
-
-    chains = (
-        retriver
-        | RunnableLambda(lambda x: get_context(x, query=query))
-        | jee_bot_prompt
-        | LLM
-        | parser
-    )
-
-    response = chains.invoke(query)
-
+    st.session_state.messages.append(HumanMessage(content=query))
+    
+    # Run the exact LangChain chain logic provided
     with st.chat_message("assistant"):
-        st.markdown(response)
-
-    st.session_state.messages.append(
-        {
-            "role": "assistant",
-            "content": response
-        }
-    )
+        with st.spinner("Analyzing and strategizing..."):
+            chain = template | LLM | parser
+            
+            # Executing using the structured variable dictionary expected by your prompt template
+            response = chain.invoke({"question": query})
+            
+            st.markdown(response)
+            
+    # Append response to maintain session states
+    st.session_state.messages.append(AIMessage(content=response))
