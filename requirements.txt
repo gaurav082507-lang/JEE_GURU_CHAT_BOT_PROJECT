@@ -1,6 +1,7 @@
 langchain
 langchain-core
 langchain-community
+torchvision
 
 # LLM Providers
 
