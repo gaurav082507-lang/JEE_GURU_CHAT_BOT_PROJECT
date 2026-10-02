@@ -1,5 +1,5 @@
 import streamlit as st
-from langchain_mistralai import ChatMistralAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.messages import AIMessage, HumanMessage
@@ -58,7 +58,7 @@ You possess deep expertise in:
 - If a problem requires complex calculation, show the setup clearly before executing the steps."""),
         ('human', "question:{question}")
     ])
-    LLM = ChatMistralAI(model='mistral-small-2603')
+    LLM = ChatGoogleGenerativeAI(model='gemini-2.5-flash')
     parser = StrOutputParser()
     return template, LLM, parser
 

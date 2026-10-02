@@ -6,9 +6,9 @@ torchvision
 # LLM Providers
 
 langchain-openai
-langchain-mistralai
+langchain-google-genai
 openai
-mistralai
+google-generativeai
 cryptography>=3.1
 
 # Vector Database
