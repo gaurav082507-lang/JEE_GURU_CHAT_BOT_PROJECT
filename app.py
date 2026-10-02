@@ -58,7 +58,7 @@ You possess deep expertise in:
 - If a problem requires complex calculation, show the setup clearly before executing the steps."""),
         ('human', "question:{question}")
     ])
-    LLM = ChatGoogleGenerativeAI(model='gemini-2.5-flash')
+    LLM = ChatGoogleGenerativeAI(model='gemini-3.5-flash-lite')
     parser = StrOutputParser()
     return template, LLM, parser
 
